@@ -51,26 +51,3 @@ colorize_normal_vec :: proc(n: Vec3) -> Vec4 {
 	r := 0.5 * (n + Vec3{1, 1, 1}) //r for remapped
 	return Vec4{r.x, r.y, r.z, 1.0}
 }
-
-Camera :: struct {
-	pos:                             Vec3,
-	view:                            Vec3,
-	// Distance from camera center pos to the viewport plane ("near plane" in RT rendering convention)
-	focal_distance:                  f32,
-	// Viewport size in distance unit
-	viewport_width, viewport_height: f32,
-}
-
-make_camera :: proc() -> Camera {
-	return Camera {
-		pos = Vec3{0, 0, 0},
-		view = Vec3{1, 0, 0},
-		focal_distance = 1.0,
-		viewport_width = 1.0,
-		viewport_height = 1.0,
-	}
-}
-
-camera_look_at :: proc(cam: ^Camera, pt: Vec3) {
-	cam.view = LA.normalize(pt - cam.pos)
-}
