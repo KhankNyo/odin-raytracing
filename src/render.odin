@@ -5,60 +5,51 @@ import "core:math/linalg"
 import "core:math/rand"
 
 Camera :: struct {
-	pos:          Vec3,
-	view:         Vec3,
-	up:           Vec3,
-	horz_fov:     f32,
+	// Camera position, in world space.
+	pos: Vec3,
+
+	// Up, a unit vector in world space.
+	// Used to determine roll, whereas yaw and pitch is determined by `view`.
+	up: Vec3,
+	
+	// View direction, a unit vector, origined at the camera. (NOT world space)
+	// i.e. if looking parallel to +X direction, this would be Vec3{1,0,0}
+	view: Vec3,
+
+	// Distance from camera position to the viewport plane ("near plane" in RT rendering convention)
+	focal_length: f32,
+
+	// Horizontal FOV of the camera.
+	horz_fov: f32,
+
 	// width/height
 	aspect_ratio: f32,
-
-	// TODO disallow mismatched aspec_ratio vs. vp_height
-	vp_width, vp_height: i32,
 }
 
 make_camera :: proc() -> Camera {
-	return Camera {
-		pos = Vec3{0, 0, 0},
-		view = Vec3{1, 0, 0},
-		up = Vec3{0, 0, 1},
-		horz_fov = 70,
-		aspect_ratio = 16 / 9,
-	}
+	return Camera{pos = Vec3{0, 0, 0}, view = Vec3{1, 0, 0}, up = Vec3{0, 0, 1}}
 }
 
 // Look at a point in world space, without changing the focal distance.
 camera_look_at :: proc(cam: ^Camera, pt: Vec3) {
-	focal_distance := linalg.length(cam.pos - cam.view)
-	cam.view = linalg.normalize(pt - cam.pos) * focal_distance
+	cam.view = linalg.normalize(pt - cam.pos)
 }
 
-camear_set_viewport :: proc(cam: ^Camera, vw, vh: i32) {
-	cam.aspect_ratio = f32(vw) / f32(vh)
-}
+render :: proc(
+	cam: ^Camera,
 
-RayTraceParams :: struct {
 	samples_per_pixel: i32,
-}
 
-// Auxiliary data that can be dervied from the primary parameters.
-CameraAux :: struct {
-	// Distance from camera center pos to the viewport plane ("near plane" in RT rendering convention)
-	focal_length:        f32,
+	// Dimension of the rendered image, in pixels.
+	// Aspect ratio `f32(viewport_width) / f32(viewport_height)` should match the `Camera.aspect_ratio` used for rendering.
+	// `viewport_width * viewport_height` should match length of `image`.
+	viewport_width, viewport_height: i32,
+
+	image: []Pixel,
+) {
 	// Dimensions (in world space) of the focal plane
-	fp_width, fp_height: f32,
-}
-
-populate_camera_aux :: proc(cam: ^Camera, aux: ^CameraAux) {
-	aux.focal_length = linalg.length(cam.pos - cam.view)
-	aux.fp_width = 2 * aux.focal_length * math.tan(cam.horz_fov / 2)
-	aux.fp_height = aux.fp_width / cam.aspect_ratio
-}
-
-render :: proc(cam: ^Camera, aux: ^CameraAux, rt_param: ^RayTraceParams) -> [dynamic]Pixel {
-	fp_width := aux.fp_width
-	fp_height := aux.fp_height
-	viewport_width := cam.vp_width
-	viewport_height := cam.vp_height
+	fp_width := 2 * cam.focal_length * math.tan(cam.horz_fov / 2)
+	fp_height := fp_width / cam.aspect_ratio
 
 	// Orthonormal basis i,j,k for camera space.
 
@@ -71,16 +62,12 @@ render :: proc(cam: ^Camera, aux: ^CameraAux, rt_param: ^RayTraceParams) -> [dyn
 
 	vp_horz := cam_i * fp_width
 	vp_vert := -cam_j * fp_height
-	vp_origin := cam.pos + cam.view - vp_horz / 2 - vp_vert / 2
+	vp_origin := cam.pos + cam.view * cam.focal_length - vp_horz / 2 - vp_vert / 2
 
 	pixel_delta_x := vp_horz / f32(viewport_width)
 	pixel_delta_y := vp_vert / f32(viewport_height)
 
-	samples_per_pixel := rt_param.samples_per_pixel
 	sample_scaling_factor := 1 / f32(samples_per_pixel)
-
-	// TODO prepare this for long running, no longer single-shot rendering process
-	image := make([dynamic]Pixel, viewport_width * viewport_height)
 
 	for y in 0 ..< viewport_height {
 		for x in 0 ..< viewport_width {
@@ -102,6 +89,4 @@ render :: proc(cam: ^Camera, aux: ^CameraAux, rt_param: ^RayTraceParams) -> [dyn
 			image[y * viewport_width + x] = pixel_denormalize(pixel_color)
 		}
 	}
-
-	return image
 }
