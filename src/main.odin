@@ -22,14 +22,17 @@ main :: proc() {
 	COMP :: len(Pixel(0))
 
 	camera := make_camera()
-	camera.pos = Vec3{-2, 0, 0}
+	camera.pos = Vec3{-3, -3, 2}
 	camera.horz_fov = 70.0 / 180 * math.PI
 	camera.aspect_ratio = IAMGE_ASPECT_RATIO
 	camera_look_at(&camera, Vec3{0, 0, 0})
 
 	world := make_world()
 	world.skybox.sky_color = pixel_normalize(Pixel{162, 224, 242, 0xFF})
-	append(&world.so_spheres, Sphere{center = Vec3{0, 0, 0}, radius = 0.5})
+	append(&world.so_spheres, Sphere{center = Vec3{0, 0, 0.5}, radius = 0.5})
+	append(&world.so_spheres, Sphere{center = Vec3{0, 1, 0.5}, radius = 0.5})
+	append(&world.so_spheres, Sphere{center = Vec3{0, -1, 0.5}, radius = 0.5})
+	append(&world.so_spheres, Sphere{center = Vec3{0, 0, -50}, radius = 50})
 
 	image := make([dynamic]Pixel, IMAGE_WIDTH * IMAGE_HEIGHT)
 

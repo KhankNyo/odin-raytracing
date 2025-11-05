@@ -16,25 +16,17 @@ SceneObject :: struct {
 	derived: any,
 }
 
-surface_normal_at :: proc {
-	surface_normal_sphere,
-}
-
-ray_intersects :: proc {
-	ray_intersects_sphere,
-}
-
 Sphere :: struct {
 	using so: SceneObject,
 	center:   Vec3,
 	radius:   f32,
 }
 
-surface_normal_sphere :: proc(sphere: ^Sphere, pt: Vec3) -> Vec3 {
+sphere_surface_normal_at :: proc(sphere: ^Sphere, pt: Vec3) -> Vec3 {
 	return LA.normalize(pt - sphere.center)
 }
 
-ray_intersects_sphere :: proc(ray: ^Ray, sphere: ^Sphere) -> f32 {
+sphere_ray_hits :: proc(ray: ^Ray, sphere: ^Sphere) -> f32 {
 	dp := sphere.center - ray.origin // displacement vector from ray origin to sphere center
 	r := sphere.radius
 

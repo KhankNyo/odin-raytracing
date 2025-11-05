@@ -86,22 +86,28 @@ render :: proc(
 					pixel_delta_y * (f32(y) + sample_y_off)
 				view_ray := Ray{cam.pos, pixel_center - cam.pos}
 
-				cloest_hit: ^Sphere = nil
+				closest_hit: ^Sphere = nil
 				closest_t: f32 = math.inf_f32(+1)
 				for &so in world.so_spheres {
-					t := ray_intersects(&view_ray, &so)
-					if !math.is_nan(t) {
-						cloest_hit = &so
-						closest_t = min(closest_t, t)
+					t := sphere_ray_hits(&view_ray, &so)
+					if !math.is_nan(t) && t < closest_t {
+						closest_hit = &so
+						closest_t = t
 					}
 				}
 
-				if cloest_hit == nil {
+				if closest_hit == nil {
 					accum += world.skybox.sky_color
 				} else {
-					intersection_pt := ray_at(&view_ray, closest_t)
-					intersection_normal := surface_normal_at(cloest_hit, intersection_pt)
-					accum += colorize_normal_vec(intersection_normal)
+					hit_pt := ray_at(&view_ray, closest_t)
+					intersection_normal := sphere_surface_normal_at(closest_hit, hit_pt)
+					// TODO get rid of this hack
+					if (closest_hit == &world.so_spheres[3]) {
+						accum += Vec4{1,0,0,1}
+					} else {
+						accum += colorize_normal_vec(intersection_normal)
+					}
+
 				}
 			}
 
