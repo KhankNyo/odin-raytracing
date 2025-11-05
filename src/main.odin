@@ -17,26 +17,25 @@ main :: proc() {
 	rand.reset(0x531864e09a8e25d6)
 
 	IMAGE_WIDTH :: 160
-	IMAGE_HEIGHT :: 80
+	IMAGE_HEIGHT :: 90
 	IAMGE_ASPECT_RATIO :: f32(IMAGE_WIDTH) / f32(IMAGE_HEIGHT)
 	COMP :: len(Pixel(0))
 
-	sphere := new(Sphere)
-	sphere.center = Vec3{0, 0, 0}
-	sphere.radius = 0.5
-
-	sky_color := pixel_normalize(Pixel{162, 224, 242, 0xFF})
-
 	camera := make_camera()
-	camera.pos = Vec3{-2, 0, 1}
-	camera.horz_fov = 70
+	camera.pos = Vec3{-2, 0, 0}
+	camera.horz_fov = 70.0 / 180 * math.PI
 	camera.aspect_ratio = IAMGE_ASPECT_RATIO
 	camera_look_at(&camera, Vec3{0, 0, 0})
+
+	world := make_world()
+	world.skybox.sky_color = pixel_normalize(Pixel{162, 224, 242, 0xFF})
+	append(&world.so_spheres, Sphere{center = Vec3{0, 0, 0}, radius = 0.5})
 
 	image := make([dynamic]Pixel, IMAGE_WIDTH * IMAGE_HEIGHT)
 
 	render(
 		&camera,
+		world,
 		samples_per_pixel = 16,
 		viewport_width = IMAGE_WIDTH,
 		viewport_height = IMAGE_HEIGHT,

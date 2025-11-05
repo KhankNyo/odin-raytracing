@@ -41,11 +41,26 @@ ray_intersects_sphere :: proc(ray: ^Ray, sphere: ^Sphere) -> f32 {
 	a := LA.dot(ray.dir, ray.dir)
 	b := -2 * LA.dot(ray.dir, dp)
 	c := LA.dot(dp, dp) - r * r
-	r1, r2 := solve_quadratic_real(a, b, c)
+	r1, _ := solve_quadratic_real(a, b, c)
 	// Doesn't hit
 	if math.is_nan(r1) {
 		return r1
 	}
-	// Hits, return the t that's positive
-	return math.max(r1, r2)
+	// Take the smaller root, that's the closer hit
+	return r1
+}
+
+SkyBox :: struct {
+	sky_color: Vec4,
+}
+
+World :: struct {
+	skybox:     SkyBox,
+	so_spheres: [dynamic]Sphere,
+}
+
+make_world :: proc() -> ^World {
+	w := new(World)
+	w.so_spheres = make([dynamic]Sphere)
+	return w
 }

@@ -1,8 +1,9 @@
 package iacta
 
 import "core:math"
-import LA "core:math/linalg"
 
+// Solve the quadratic equation ax^2 + bx + c for Reals x_1, x_2.
+// If there are two distinct real solutions, x_1 < x_2.
 solve_quadratic_real :: proc(a, b, c: f32) -> (f32, f32) {
 	discriminant := b * b - 4.0 * a * c
 	if discriminant < 0.0 {
@@ -10,7 +11,7 @@ solve_quadratic_real :: proc(a, b, c: f32) -> (f32, f32) {
 		return NaN, NaN
 	}
 	root := math.sqrt_f32(discriminant)
-	return (-b + root) / (2.0 * a), (-b - root) / (2.0 * a)
+	return (-b - root) / (2.0 * a), (-b + root) / (2.0 * a)
 }
 
 Vec4 :: distinct [4]f32

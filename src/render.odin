@@ -27,7 +27,12 @@ Camera :: struct {
 }
 
 make_camera :: proc() -> Camera {
-	return Camera{pos = Vec3{0, 0, 0}, view = Vec3{1, 0, 0}, up = Vec3{0, 0, 1}}
+	return Camera {
+		pos = Vec3{0, 0, 0},
+		up = Vec3{0, 0, 1},
+		view = Vec3{1, 0, 0},
+		focal_length = 1.0,
+	}
 }
 
 // Look at a point in world space, without changing the focal distance.
@@ -37,14 +42,13 @@ camera_look_at :: proc(cam: ^Camera, pt: Vec3) {
 
 render :: proc(
 	cam: ^Camera,
-
+	world: ^World,
 	samples_per_pixel: i32,
 
 	// Dimension of the rendered image, in pixels.
 	// Aspect ratio `f32(viewport_width) / f32(viewport_height)` should match the `Camera.aspect_ratio` used for rendering.
 	// `viewport_width * viewport_height` should match length of `image`.
 	viewport_width, viewport_height: i32,
-
 	image: []Pixel,
 ) {
 	// Dimensions (in world space) of the focal plane
@@ -82,7 +86,23 @@ render :: proc(
 					pixel_delta_y * (f32(y) + sample_y_off)
 				view_ray := Ray{cam.pos, pixel_center - cam.pos}
 
-				// TODO
+				cloest_hit: ^Sphere = nil
+				closest_t: f32 = math.inf_f32(+1)
+				for &so in world.so_spheres {
+					t := ray_intersects(&view_ray, &so)
+					if !math.is_nan(t) {
+						cloest_hit = &so
+						closest_t = min(closest_t, t)
+					}
+				}
+
+				if cloest_hit == nil {
+					accum += world.skybox.sky_color
+				} else {
+					intersection_pt := ray_at(&view_ray, closest_t)
+					intersection_normal := surface_normal_at(cloest_hit, intersection_pt)
+					accum += colorize_normal_vec(intersection_normal)
+				}
 			}
 
 			pixel_color := accum * sample_scaling_factor
