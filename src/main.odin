@@ -29,10 +29,19 @@ main :: proc() {
 
 	world := make_world()
 	world.skybox.sky_color = pixel_normalize(Pixel{162, 224, 242, 0xFF})
-	append(&world.so_spheres, Sphere{center = Vec3{0, 0, 0.5}, radius = 0.5})
-	append(&world.so_spheres, Sphere{center = Vec3{0, 1, 0.5}, radius = 0.5})
-	append(&world.so_spheres, Sphere{center = Vec3{0, -1, 0.5}, radius = 0.5})
-	append(&world.so_spheres, Sphere{center = Vec3{0, 0, -50}, radius = 50})
+	add_obj :: proc(world: ^World, s: $T) {
+		append(&world.scene_objects, SceneObject{shape = s, material = NormalDebugMaterial{}})
+	}
+	add_obj(world, Sphere{center = Vec3{0, 0, 0.5}, radius = 0.5})
+	add_obj(world, Sphere{center = Vec3{0, 1, 0.5}, radius = 0.5})
+	add_obj(world, Sphere{center = Vec3{0, -1, 0.5}, radius = 0.5})
+	append(
+		&world.scene_objects,
+		SceneObject {
+			shape = Sphere{center = Vec3{0, 0, -50}, radius = 50},
+			material = PureColorMaterial{color = pixel_normalize(RED_PIXEL)},
+		},
+	)
 
 	image := make([dynamic]Pixel, IMAGE_WIDTH * IMAGE_HEIGHT)
 

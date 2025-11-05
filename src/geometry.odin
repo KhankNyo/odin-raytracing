@@ -13,13 +13,47 @@ ray_at :: proc(ray: ^Ray, t: f32) -> Vec3 {
 }
 
 SceneObject :: struct {
-	derived: any,
+	shape:    union {
+		Sphere,
+	},
+	material: union {
+		NormalDebugMaterial,
+		PureColorMaterial,
+	},
+}
+
+surface_normal_at :: proc(so: ^SceneObject, pt: Vec3) -> Vec3 {
+	switch &shape in so.shape {
+	case Sphere:
+		return sphere_surface_normal_at(&shape, pt)
+	}
+
+	return Vec3{}
+}
+
+material_contribution_at :: proc(so: ^SceneObject, pt, n: Vec3) -> Vec4 {
+	switch &material in so.material {
+	case NormalDebugMaterial:
+		return colorize_normal_vec(n)
+	case PureColorMaterial:
+		return material.color
+	}
+
+	return Vec4{}
+}
+
+ray_hits :: proc(ray: ^Ray, so: ^SceneObject) -> f32 {
+	switch &shape in so.shape {
+	case Sphere:
+		return sphere_ray_hits(ray, &shape)
+	}
+
+	return math.nan_f32()
 }
 
 Sphere :: struct {
-	using so: SceneObject,
-	center:   Vec3,
-	radius:   f32,
+	center: Vec3,
+	radius: f32,
 }
 
 sphere_surface_normal_at :: proc(sphere: ^Sphere, pt: Vec3) -> Vec3 {
@@ -47,12 +81,12 @@ SkyBox :: struct {
 }
 
 World :: struct {
-	skybox:     SkyBox,
-	so_spheres: [dynamic]Sphere,
+	skybox:        SkyBox,
+	scene_objects: [dynamic]SceneObject,
 }
 
 make_world :: proc() -> ^World {
 	w := new(World)
-	w.so_spheres = make([dynamic]Sphere)
+	w.scene_objects = make([dynamic]SceneObject)
 	return w
 }

@@ -6,21 +6,21 @@ import "core:math/rand"
 
 Camera :: struct {
 	// Camera position, in world space.
-	pos: Vec3,
+	pos:          Vec3,
 
 	// Up, a unit vector in world space.
 	// Used to determine roll, whereas yaw and pitch is determined by `view`.
-	up: Vec3,
-	
+	up:           Vec3,
+
 	// View direction, a unit vector, origined at the camera. (NOT world space)
 	// i.e. if looking parallel to +X direction, this would be Vec3{1,0,0}
-	view: Vec3,
+	view:         Vec3,
 
 	// Distance from camera position to the viewport plane ("near plane" in RT rendering convention)
 	focal_length: f32,
 
 	// Horizontal FOV of the camera.
-	horz_fov: f32,
+	horz_fov:     f32,
 
 	// width/height
 	aspect_ratio: f32,
@@ -38,6 +38,12 @@ make_camera :: proc() -> Camera {
 // Look at a point in world space, without changing the focal distance.
 camera_look_at :: proc(cam: ^Camera, pt: Vec3) {
 	cam.view = linalg.normalize(pt - cam.pos)
+}
+
+NormalDebugMaterial :: struct {}
+
+PureColorMaterial :: struct {
+	color: Vec4,
 }
 
 render :: proc(
@@ -86,10 +92,10 @@ render :: proc(
 					pixel_delta_y * (f32(y) + sample_y_off)
 				view_ray := Ray{cam.pos, pixel_center - cam.pos}
 
-				closest_hit: ^Sphere = nil
+				closest_hit: ^SceneObject = nil
 				closest_t: f32 = math.inf_f32(+1)
-				for &so in world.so_spheres {
-					t := sphere_ray_hits(&view_ray, &so)
+				for &so in world.scene_objects {
+					t := ray_hits(&view_ray, &so)
 					if !math.is_nan(t) && t < closest_t {
 						closest_hit = &so
 						closest_t = t
@@ -100,14 +106,8 @@ render :: proc(
 					accum += world.skybox.sky_color
 				} else {
 					hit_pt := ray_at(&view_ray, closest_t)
-					intersection_normal := sphere_surface_normal_at(closest_hit, hit_pt)
-					// TODO get rid of this hack
-					if (closest_hit == &world.so_spheres[3]) {
-						accum += Vec4{1,0,0,1}
-					} else {
-						accum += colorize_normal_vec(intersection_normal)
-					}
-
+					hit_normal := surface_normal_at(closest_hit, hit_pt)
+					accum += material_contribution_at(closest_hit, hit_pt, hit_normal)
 				}
 			}
 
