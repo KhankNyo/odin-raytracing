@@ -98,7 +98,7 @@ render_gpu :: proc(
 	VertexShaderFileName := "shaders/VertexShader.glsl"
 	State, Window := Init("hello ray tracin'", viewport_width, viewport_height)
 	defer Deinit(Window);
-	ShouldReloadShader := false;
+	ShouldReloadShader := true;
 	for (!glfw.WindowShouldClose(Window)) 
 	{
 		glfw.PollEvents()
