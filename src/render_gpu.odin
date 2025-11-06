@@ -98,7 +98,7 @@ render_gpu :: proc(
 	VertexShaderFileName := "shaders/VertexShader.glsl"
 	State, Window := Init("hello ray tracin'", viewport_width, viewport_height)
 	defer Deinit(Window);
-	ShouldReloadShader := true;
+	ShouldReloadShader := false;
 	for (!glfw.WindowShouldClose(Window)) 
 	{
 		glfw.PollEvents()
@@ -270,13 +270,18 @@ LoadShader :: proc(FragmentShaderFileName: string, VertexShaderFileName: string)
 	ErrMsg: [1024]u8
 	if VertexShaderSource, Ok := os.read_entire_file_from_filename(VertexShaderFileName); Ok 
 	{
+		defer delete_slice(VertexShaderSource);
 		if FragmentShaderSource, Ok := os.read_entire_file_from_filename(FragmentShaderFileName); Ok 
 		{
+			defer delete_slice(FragmentShaderSource);
+
 			/* read shaders ok, compile the shaders */
 			if VertexShaderID, Ok := CompileShader(gl.VERTEX_SHADER, VertexShaderSource); Ok 
 			{
+				defer gl.DeleteShader(VertexShaderID);
 				if FragmentShaderID, Ok := CompileShader(gl.FRAGMENT_SHADER, FragmentShaderSource); Ok 
 				{
+					defer gl.DeleteShader(FragmentShaderID);
 
 					/* compile ok, link the shaders */
 					ShaderProgramID = gl.CreateProgram()
