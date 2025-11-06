@@ -16,8 +16,8 @@ main :: proc() {
 	// Use fixed RNG seed for reproducible rendering results
 	rand.reset(0x531864e09a8e25d6)
 
-	IMAGE_WIDTH :: 160
-	IMAGE_HEIGHT :: 90
+	IMAGE_WIDTH :: 1024
+	IMAGE_HEIGHT :: 720
 	IAMGE_ASPECT_RATIO :: f32(IMAGE_WIDTH) / f32(IMAGE_HEIGHT)
 	COMP :: len(Pixel(0))
 
@@ -43,23 +43,37 @@ main :: proc() {
 		},
 	)
 
+
 	image := make([dynamic]Pixel, IMAGE_WIDTH * IMAGE_HEIGHT)
+	if false
+	{
+		render(
+			&camera,
+			world,
+			samples_per_pixel = 16,
+			viewport_width = IMAGE_WIDTH,
+			viewport_height = IMAGE_HEIGHT,
+			image = image[:],
+		)
 
-	render(
-		&camera,
-		world,
-		samples_per_pixel = 16,
-		viewport_width = IMAGE_WIDTH,
-		viewport_height = IMAGE_HEIGHT,
-		image = image[:],
-	)
-
-	stbi.write_png(
-		"./out/output.png",
-		IMAGE_WIDTH,
-		IMAGE_HEIGHT,
-		COMP,
-		&image[0],
-		size_of(image[0]) * IMAGE_WIDTH,
-	)
+		stbi.write_png(
+			"./out/output.png",
+			IMAGE_WIDTH,
+			IMAGE_HEIGHT,
+			COMP,
+			&image[0],
+			size_of(image[0]) * IMAGE_WIDTH,
+		)
+	}
+	else
+	{
+		render_gpu(
+			&camera,
+			world,
+			samples_per_pixel = 16,
+			viewport_width = IMAGE_WIDTH,
+			viewport_height = IMAGE_HEIGHT,
+			image = image[:],
+		)
+	}
 }

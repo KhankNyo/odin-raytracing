@@ -4,7 +4,12 @@
 
 # Let each user customize
 /ols.json
+.nvimrc
+build.bat
 
 # Build outputs and runtime files
 /build/
 /out/
+*.pdb
+*.exe
+*.rdi
