@@ -23,6 +23,7 @@ render_state :: struct
 {
 	ShaderProgramID: GLuint,
 	VAO: GLuint, /* vertex attribute object */
+	ShouldReloadShader: bool,
 }
 
 
@@ -94,25 +95,26 @@ render_gpu :: proc(
 	}
 
 
-	FragmentShaderFileName := "shaders/FragmentShader.glsl"
-	VertexShaderFileName := "shaders/VertexShader.glsl"
-	State, Window := Init("hello ray tracin'", viewport_width, viewport_height)
+	FragmentShaderFileName := "shaders/FragmentShader.glsl";
+	VertexShaderFileName := "shaders/VertexShader.glsl";
+	State: render_state = {
+		ShouldReloadShader = false,
+	};
+	Window := Init(&State, "hello ray tracin'", viewport_width, viewport_height);
 	defer Deinit(Window);
-	ShouldReloadShader := true;
+
+	LoadShaderData(&State);
+	LoadShader(&State, FragmentShaderFileName, VertexShaderFileName);
 	for (!glfw.WindowShouldClose(Window)) 
 	{
 		glfw.PollEvents()
 		Width, Height := glfw.GetWindowSize(Window)
 
 		/* update */
-		if ShouldReloadShader 
+		if State.ShouldReloadShader 
 		{
-			gl.UseProgram(0)
-			gl.DeleteProgram(State.ShaderProgramID)
-
-			State.ShaderProgramID = LoadShader(FragmentShaderFileName, VertexShaderFileName)
-			gl.UseProgram(State.ShaderProgramID)
-			ShouldReloadShader = false
+			LoadShader(&State, FragmentShaderFileName, VertexShaderFileName);
+			State.ShouldReloadShader = false;
 		}
 
 		/* draw */
@@ -144,7 +146,58 @@ render_gpu :: proc(
 }
 
 
-Init :: proc(WindowName: cstring, Width, Height: i32) -> (render_state, glfw.WindowHandle)
+LoadShaderData :: proc(State: ^render_state)
+{
+	/* VAO, VBO, EBO */
+	FullScreen := [?]f32 {
+		-1.0, 1.0, 0.0, 
+		1.0, 1.0, 0.0, 
+		1.0, -1.0, 0.0, 
+		-1.0, -1.0, 0.0, 
+	}
+	Indices := [?]u32 {
+		0, 1, 2, 
+		2, 3, 0,
+	}
+
+	/* vertex attrib */
+	State.ShaderProgramID = 0;
+	gl.GenVertexArrays(1, &State.VAO)
+	gl.BindVertexArray(State.VAO)
+	{
+		/* vertex buffer object */
+		VBO: GLuint
+		gl.GenBuffers(1, &VBO)
+		gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
+		gl.BufferData(gl.ARRAY_BUFFER, size_of(FullScreen), &FullScreen, gl.STATIC_DRAW)
+
+		/* element buffer object */
+		EBO: GLuint
+		gl.GenBuffers(1, &EBO)
+		gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO)
+		gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, size_of(Indices), &Indices, gl.STATIC_DRAW)
+
+		/* data to the gpu */
+		VertexLocationInVertexShader: GLuint = 0
+		gl.VertexAttribPointer(VertexLocationInVertexShader, 3, gl.FLOAT, gl.FALSE, 3*size_of(f32), 0)
+		gl.EnableVertexAttribArray(VertexLocationInVertexShader)
+	}
+}
+
+KeyCallback :: proc "c" (Window: glfw.WindowHandle, Key, Scancode, Action, Mod: i32)
+{
+	State := transmute(^render_state)glfw.GetWindowUserPointer(Window)
+	if Action == glfw.PRESS
+	{
+		switch (Key)
+		{
+		case glfw.KEY_R:
+			State.ShouldReloadShader = true;
+		}
+	}
+}
+
+Init :: proc(State: ^render_state, WindowName: cstring, Width, Height: i32) -> (glfw.WindowHandle)
 {
 	// glfw hints
 	glfw.WindowHint(glfw.RESIZABLE, 1)
@@ -169,6 +222,8 @@ Init :: proc(WindowName: cstring, Width, Height: i32) -> (render_state, glfw.Win
 	// Enable vsync
 	glfw.SwapInterval(0)
 	glfw.SetFramebufferSizeCallback(Window, SizeCallback)
+	glfw.SetKeyCallback(Window, KeyCallback);
+	glfw.SetWindowUserPointer(Window, State);
 
 	// Set OpenGL Context bindings using the helper function
 	// See Odin Vendor source for specifc implementation details
@@ -176,42 +231,7 @@ Init :: proc(WindowName: cstring, Width, Height: i32) -> (render_state, glfw.Win
 	// https://www.glfw.org/docs/3.3/group__context.html#ga35f1837e6f666781842483937612f163
 	gl.load_up_to(int(GL_MAJOR_VERSION), GL_MINOR_VERSION, glfw.gl_set_proc_address) 
 
-
-	/* VAO, VBO, EBO */
-	FullScreen := [?]f32 {
-		-1.0, 1.0, 0.0, 
-		1.0, 1.0, 0.0, 
-		1.0, -1.0, 0.0, 
-		-1.0, -1.0, 0.0, 
-	}
-	Indices := [?]u32 {
-		0, 1, 2, 
-		2, 3, 0,
-	}
-
-	/* vertex attrib */
-	State: render_state;
-	gl.GenVertexArrays(1, &State.VAO)
-	gl.BindVertexArray(State.VAO)
-	{
-		/* vertex buffer object */
-		VBO: GLuint
-		gl.GenBuffers(1, &VBO)
-		gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
-		gl.BufferData(gl.ARRAY_BUFFER, size_of(FullScreen), &FullScreen, gl.STATIC_DRAW)
-
-		/* element buffer object */
-		EBO: GLuint
-		gl.GenBuffers(1, &EBO)
-		gl.BindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO)
-		gl.BufferData(gl.ELEMENT_ARRAY_BUFFER, size_of(Indices), &Indices, gl.STATIC_DRAW)
-
-		/* data to the gpu */
-		VertexLocationInVertexShader: GLuint = 0
-		gl.VertexAttribPointer(VertexLocationInVertexShader, 3, gl.FLOAT, gl.FALSE, 3*size_of(f32), 0)
-		gl.EnableVertexAttribArray(VertexLocationInVertexShader)
-	}
-	return State, Window;
+	return Window;
 }
 
 Deinit :: proc(Window: glfw.WindowHandle)
@@ -265,8 +285,15 @@ ShaderSetIntArray :: proc(Program: GLuint, UniformName: cstring, Values: [^]GLin
 
 
 
-LoadShader :: proc(FragmentShaderFileName: string, VertexShaderFileName: string) -> (ShaderProgramID: GLuint = 0)
+LoadShader :: proc(
+	State: ^render_state, 
+	FragmentShaderFileName: string, 
+	VertexShaderFileName: string) 
 {
+	ShaderProgramID: GLuint;
+	gl.UseProgram(0);
+	gl.DeleteProgram(State.ShaderProgramID);
+
 	ErrMsg: [1024]u8
 	if VertexShaderSource, Ok := os.read_entire_file_from_filename(VertexShaderFileName); Ok 
 	{
@@ -324,7 +351,9 @@ LoadShader :: proc(FragmentShaderFileName: string, VertexShaderFileName: string)
 	{
 		fmt.println("Unable to open '", VertexShaderFileName, "'", sep="")
 	}
-	return ShaderProgramID
+
+	State.ShaderProgramID = ShaderProgramID;
+	gl.UseProgram(State.ShaderProgramID);
 }
 
 
