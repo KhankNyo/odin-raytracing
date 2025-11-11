@@ -20,11 +20,12 @@ Vec3 :: distinct [3]f32
 // RGBA
 Pixel :: distinct [4]u8
 
-BLACK_PIXEL :: Pixel{0xFF, 0xFF, 0xFF, 0xFF}
-WHITE_PIXEL :: Pixel{0, 0, 0, 0xFF}
+BLACK_PIXEL :: Pixel{0, 0, 0, 0xFF}
+WHITE_PIXEL :: Pixel{0xFF, 0xFF, 0xFF, 0xFF}
 RED_PIXEL :: Pixel{255, 0, 0, 0xFF}
 GREEN_PIXEL :: Pixel{0, 255, 0, 0xFF}
 BLUE_PIXEL :: Pixel{0, 0, 255, 0xFF}
+GRAY_PIXEL :: Pixel{128, 128, 128, 0xFF}
 
 pixel_denormalize :: proc(v: Vec4) -> Pixel {
 	// Ray Tracing in a Weekend:

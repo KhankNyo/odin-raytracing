@@ -8,6 +8,7 @@
 #define MATERIAL_NORMAL_DEBUG 0
 #define MATERIAL_PURE_COLOR 1
 #define OBJ_SPHERE 0
+#define IN_RANGE(lower, n, upper) ((lower) <= (n) && (n) <= (upper))
 
 
 struct obj_data 
@@ -43,19 +44,18 @@ vec2 gRandSeed;
 
 
 
-// Source - https://stackoverflow.com/a
-// Posted by Darik Mohammed, modified by community. See post 'Timeline' for change history
-// Retrieved 2025-11-08, License - CC BY-SA 4.0
-float Rand(vec2 st)
+float Rand(vec2 Pos)
 {
-    return fract(sin(dot(st.xy, vec2(12.9898f,78.233f))) * 43758.5453123f);
+	float Result = fract(sin(dot(Pos.xy ,vec2(12.9898,78.233))) * 43758.5453);
+	gRandSeed = vec2(Result, gRandSeed.x);
+	return Result;
 }
+
 
 /* returns a random vector inside a unit cube */
 vec2 RandVec2() 
 {
 	vec2 Result = vec2(Rand(gRandSeed), Rand(gRandSeed));
-	gRandSeed = Result;
 	return Result;
 }
 
@@ -68,7 +68,14 @@ vec4 RandVec4()
 vec3 RandUnitVec3()
 {
 	vec3 Result = RandVec4().xyz;
-	return Result / length(Result);
+	float Length = length(Result);
+	while (Length < 1e-160)
+	{
+		Result = RandVec4().xyz;
+		Length = length(Result);
+	}
+	Result /= Length;
+	return Result;
 }
 
 vec3 RandUnitVec3OnHemiSphere(vec3 Normal)
@@ -92,7 +99,7 @@ vec4 PixelDenormalize(vec4 Color)
 }
 
 
-float Sphere_RayHits(ray Ray, vec3 SphereCenter, float SphereRadius)
+float Sphere_RayHits(ray Ray, float LowerBound, float UpperBound, vec3 SphereCenter, float SphereRadius)
 {
 	vec3 Dp = SphereCenter - Ray.Origin;
 	float R = SphereRadius;
@@ -108,8 +115,19 @@ float Sphere_RayHits(ray Ray, vec3 SphereCenter, float SphereRadius)
 		return NON_HIT_VALUE;
 	}
 
-	/* don't care abt the other root bc it's too far */
-	float ClosestHit = (-B - sqrt(Discriminant)) / (2.0f * A);
+
+	/* try '-' root first */
+	float SqrtD = sqrt(Discriminant);
+	float ClosestHit = (-B - SqrtD) / (2.0f * A);
+	if (!IN_RANGE(LowerBound, ClosestHit, UpperBound))
+	{
+		/* try '+' root */
+		ClosestHit = (-B - SqrtD) / (2.0f * A);
+		if (!IN_RANGE(LowerBound, ClosestHit, UpperBound))
+		{
+			return NON_HIT_VALUE;
+		}
+	}
 	return ClosestHit;
 }
 
@@ -117,20 +135,20 @@ float Sphere_RayHits(ray Ray, vec3 SphereCenter, float SphereRadius)
    I can't use NAN here bc it's implementation defined in glsl (may break on some gpu but run fine on others). 
    I used FLT_MAX instead
  */
-float RayHits(ray Ray, int ObjType, vec4 ObjData)
+float RayHits(ray Ray, float LowerBound, float UpperBound, int ObjType, vec4 ObjData)
 {
 	switch (ObjType)
 	{
-	case OBJ_SPHERE:
-	{
-		vec3 Origin = ObjData.xyz;
-		float Radius = ObjData.w;
-		return Sphere_RayHits(Ray, Origin, Radius);
-	} break;
-	default: 
-	{
-		return NON_HIT_VALUE;
-	} break;
+		case OBJ_SPHERE:
+			{
+				vec3 Origin = ObjData.xyz;
+				float Radius = ObjData.w;
+				return Sphere_RayHits(Ray, LowerBound, UpperBound, Origin, Radius);
+			} break;
+		default: 
+			{
+				return NON_HIT_VALUE;
+			} break;
 	}
 }
 
@@ -145,15 +163,15 @@ vec3 SurfaceNormalAt(obj_data Obj, vec3 Point)
 	vec3 Result;
 	switch (Obj.Type)
 	{
-	case OBJ_SPHERE:
-	{
-		vec3 SphereCenter = Obj.Data.xyz;
-		Result = normalize(Point - SphereCenter); /* built-in glsl function */
-	} break;
-	default:  
-	{
-		Result = vec3(0.0f);
-	} break;
+		case OBJ_SPHERE:
+			{
+				vec3 SphereCenter = Obj.Data.xyz;
+				Result = normalize(Point - SphereCenter); /* built-in glsl function */
+			} break;
+		default:  
+			{
+				Result = vec3(0.0f);
+			} break;
 	}
 	return Result;
 }
@@ -166,34 +184,61 @@ vec4 ColorizeNormalVec(vec3 Normal)
 	return Result;
 }
 
-vec4 MaterialContributionAt(obj_data Obj, vec3 HitPoint, vec3 Normal)
+vec4 MaterialAt(obj_data Obj, vec3 HitPoint, vec3 Normal)
 {
 	vec4 Result;
 	switch (Obj.MaterialType)
 	{
-	case MATERIAL_NORMAL_DEBUG:
-	{
-		Result = ColorizeNormalVec(Normal);
-	} break;
-	case MATERIAL_PURE_COLOR:
-	{
-		Result = Obj.MaterialColor;
-	} break;
+		case MATERIAL_NORMAL_DEBUG:
+			{
+				Result = ColorizeNormalVec(Normal);
+			} break;
+		case MATERIAL_PURE_COLOR:
+			{
+				/* TODO: material reflective factor */
+				Result = 0.8 * Obj.MaterialColor;
+			} break;
 	}
 	return Result;
 }
 
 
-vec4 RayColor(ray ViewRay)
+ray GetBounceDirection(int MaterialType, vec3 HitNormal, vec3 HitLocation)
 {
-	vec4 ResultColor;
+	switch (MaterialType)
+	{
+		case MATERIAL_PURE_COLOR:
+			{
+				vec3 BounceDirection = HitNormal + RandUnitVec3OnHemiSphere(HitNormal);
+				ray BounceRay = ray(HitLocation, BounceDirection);
+				return BounceRay;
+			}
+		case MATERIAL_NORMAL_DEBUG:
+			{
+				/* reflect like glass */
+				vec3 Reflection = HitLocation + 2.0f * dot(HitNormal, HitLocation) * HitNormal;
+				vec3 BounceDirection = HitNormal + Reflection;
+				ray BounceRay = ray(HitLocation, BounceDirection);
+				return BounceRay;
+			}
+	}
+}
+
+vec4 RayColor(ray ViewRay, int MaxRayBounce)
+{
+#if 0
+	vec4 ResultColor = vec4(0.0f);
+	if (MaxRayBounce <= 0)
+	{
+		return ResultColor;
+	}
 
 	int HitIndex = -1;
 	float ClosestDst = FLT_MAX;
 	for (int i = 0; i < u_WorldObjCount; i++)
 	{
-		float DstToObj = RayHits(ViewRay, u_WorldObjType[i], u_WorldObjData[i]);
-		if (DstToObj != NON_HIT_VALUE && DstToObj < ClosestDst)
+		float DstToObj = RayHits(ViewRay, 0.001f, ClosestDst, u_WorldObjType[i], u_WorldObjData[i]);
+		if (DstToObj != NON_HIT_VALUE)
 		{
 			HitIndex = i;
 			ClosestDst = DstToObj;
@@ -216,13 +261,63 @@ vec4 RayColor(ray ViewRay)
 
 		vec3 HitLocation = RayAt(ViewRay, ClosestDst);
 		vec3 HitNormal = SurfaceNormalAt(ClosestObj, HitLocation);
-		ResultColor = MaterialContributionAt(ClosestObj, HitLocation, HitNormal);
+		ResultColor = MaterialAt(ClosestObj, HitLocation, HitNormal);
+
+		/* bounce */
+		vec3 BounceDirection = HitNormal + RandUnitVec3();
+		ray BounceRay = ray(HitLocation, BounceDirection);
+		ResultColor = 0.5f * RayColor(BounceRay, MaxRayBounce - 1);
 	}
 	return ResultColor;
+#else
+	/* GLSL does not allow recursion, need a loop version to trace rays */
+	vec4 ResultColor = vec4(1.0f);
+	for (int i = 0; i < MaxRayBounce; i++)
+	{
+		/* find closest object */
+
+		int HitIndex = -1;
+		float ClosestDst = FLT_MAX;
+		for (int i = 0; i < u_WorldObjCount; i++)
+		{
+			float DstToObj = RayHits(ViewRay, 0.01f, ClosestDst, u_WorldObjType[i], u_WorldObjData[i]);
+			if (DstToObj != NON_HIT_VALUE)
+			{
+				HitIndex = i;
+				ClosestDst = DstToObj;
+			}
+		}
+
+		if (HitIndex != -1)
+		{
+			/* hit */
+			obj_data ClosestObj;
+			ClosestObj.Type = u_WorldObjType[HitIndex];
+			ClosestObj.MaterialType = u_WorldObjMaterialType[HitIndex];
+			ClosestObj.MaterialColor = u_WorldObjMaterialColor[HitIndex];
+			ClosestObj.Data = u_WorldObjData[HitIndex];
+
+			vec3 HitLocation = RayAt(ViewRay, ClosestDst);
+			vec3 HitNormal = SurfaceNormalAt(ClosestObj, HitLocation);
+			ResultColor *= MaterialAt(ClosestObj, HitLocation, HitNormal);
+
+			/* bounce */
+			ViewRay = GetBounceDirection(ClosestObj.MaterialType, HitNormal, HitLocation);
+		}
+		else
+		{
+			/* no hit */
+			ResultColor *= u_SkyColor;
+			break;
+		}
+	}
+	return ResultColor;
+#endif
 }
 
 void main()
 {
+	int MaxRayBounce = 10;
 	float x = gl_FragCoord.x - 0.5f;
 	float y = u_ScreenHeight - gl_FragCoord.y - 0.5f;
 	vec4 Accum = vec4(0.0f);
@@ -240,7 +335,7 @@ void main()
 		ViewRay.Origin = u_CamPos;
 		ViewRay.Direction = PixelCenter - u_CamPos;
 
-		Accum += RayColor(ViewRay);
+		Accum += RayColor(ViewRay, MaxRayBounce);
 	}
 
 	vec4 PixelColor = Accum * u_SampleScalingFactor;
